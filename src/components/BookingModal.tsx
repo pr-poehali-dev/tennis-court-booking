@@ -49,10 +49,11 @@ function getAvailableHours(
   const booked = bookings
     .filter((b) => b.date === date && b.status !== "cancelled")
     .flatMap((b) => {
+      const [hh, mm] = b.startTime.split(":").map(Number);
+      const start = hh + mm / 60;
       const slots = [];
       for (let i = 0; i < b.duration * 2; i++) {
-        const h = parseFloat(b.startTime.split(":")[0]) + parseFloat(b.startTime.split(":")[1]) / 60 + i * 0.5;
-        slots.push(h);
+        slots.push(Math.round((start + i * 0.5) * 10) / 10);
       }
       return slots;
     });
@@ -63,15 +64,13 @@ function getAvailableHours(
 
   const available: number[] = [];
   const maxEnd = 23;
-  for (let h = 7; h <= maxEnd - duration; h += 1) {
+  for (let h = 7; h + duration <= maxEnd; h += 0.5) {
     const needed = [];
     for (let i = 0; i < duration * 2; i++) {
-      needed.push(h + i * 0.5);
+      needed.push(Math.round((h + i * 0.5) * 10) / 10);
     }
     const allFree = needed.every((slot) => !booked.includes(slot) && !blocked.includes(slot));
-    if (allFree && h + duration <= maxEnd) {
-      available.push(h);
-    }
+    if (allFree) available.push(h);
   }
   return available;
 }
