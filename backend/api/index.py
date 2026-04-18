@@ -1,0 +1,207 @@
+"""
+Основной API для теннисного корта.
+Обрабатывает бронирования, отзывы, фото, блокировки.
+"""
+import json
+import os
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from datetime import datetime, date
+
+SCHEMA = "t_p43674581_tennis_court_booking"
+
+CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, X-User-Id, X-Auth-Token",
+    "Content-Type": "application/json",
+}
+
+
+def get_conn():
+    return psycopg2.connect(os.environ["DATABASE_URL"], cursor_factory=RealDictCursor)
+
+
+def resp(status, body):
+    return {"statusCode": status, "headers": CORS_HEADERS, "body": json.dumps(body, ensure_ascii=False, default=str)}
+
+
+def handler(event: dict, context) -> dict:
+    if event.get("httpMethod") == "OPTIONS":
+        return {"statusCode": 200, "headers": CORS_HEADERS, "body": ""}
+
+    method = event.get("httpMethod", "GET")
+    path = event.get("path", "/")
+    body = {}
+    if event.get("body"):
+        try:
+            body = json.loads(event["body"])
+        except Exception:
+            body = {}
+
+    qs = event.get("queryStringParameters") or {}
+
+    # ─── BOOKINGS ────────────────────────────────────────────────
+    if path == "/bookings" and method == "GET":
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                phone = qs.get("phone")
+                if phone:
+                    phone_clean = "".join(c for c in phone if c.isdigit() or c == "+")
+                    cur.execute(
+                        f"SELECT * FROM {SCHEMA}.bookings WHERE regexp_replace(user_phone,'\\D','','g') = regexp_replace(%s,'\\D','','g') ORDER BY date, start_time",
+                        (phone_clean,)
+                    )
+                else:
+                    cur.execute(f"SELECT * FROM {SCHEMA}.bookings ORDER BY date, start_time")
+                rows = cur.fetchall()
+        return resp(200, [dict(r) for r in rows])
+
+    if path == "/bookings" and method == "POST":
+        b = body
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""INSERT INTO {SCHEMA}.bookings
+                    (user_phone, user_name, date, start_time, duration, extras_balls, extras_rackets, extras_trainer, total_price, status)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,'pending') RETURNING *""",
+                    (
+                        b.get("phone"), b.get("userName"), b.get("date"), b.get("startTime"),
+                        b.get("duration"), b.get("extras", {}).get("balls", False),
+                        b.get("extras", {}).get("rackets", 0), b.get("extras", {}).get("trainer", False),
+                        b.get("totalPrice"),
+                    ),
+                )
+                row = dict(cur.fetchone())
+            conn.commit()
+        return resp(201, row)
+
+    if path.startswith("/bookings/") and method == "PUT":
+        booking_id = path.split("/")[-1]
+        b = body
+        action = b.get("action")
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                if action == "confirm":
+                    cur.execute(f"UPDATE {SCHEMA}.bookings SET status='confirmed' WHERE id=%s RETURNING *", (booking_id,))
+                elif action == "cancel":
+                    cur.execute(f"UPDATE {SCHEMA}.bookings SET status='cancelled' WHERE id=%s RETURNING *", (booking_id,))
+                elif action == "edit":
+                    cur.execute(
+                        f"""UPDATE {SCHEMA}.bookings SET
+                        date=%s, start_time=%s, duration=%s,
+                        extras_balls=%s, extras_rackets=%s, extras_trainer=%s,
+                        total_price=%s, status='pending'
+                        WHERE id=%s RETURNING *""",
+                        (
+                            b.get("date"), b.get("startTime"), b.get("duration"),
+                            b.get("extras", {}).get("balls", False),
+                            b.get("extras", {}).get("rackets", 0),
+                            b.get("extras", {}).get("trainer", False),
+                            b.get("totalPrice"), booking_id,
+                        ),
+                    )
+                else:
+                    return resp(400, {"error": "Unknown action"})
+                row = cur.fetchone()
+            conn.commit()
+        return resp(200, dict(row) if row else {})
+
+    if path.startswith("/bookings/") and method == "DELETE":
+        booking_id = path.split("/")[-1]
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(f"DELETE FROM {SCHEMA}.bookings WHERE id=%s", (booking_id,))
+            conn.commit()
+        return resp(200, {"ok": True})
+
+    # ─── REVIEWS ─────────────────────────────────────────────────
+    if path == "/reviews" and method == "GET":
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(f"SELECT * FROM {SCHEMA}.reviews ORDER BY created_at DESC")
+                rows = cur.fetchall()
+        return resp(200, [dict(r) for r in rows])
+
+    if path == "/reviews" and method == "POST":
+        b = body
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"INSERT INTO {SCHEMA}.reviews (author_phone, author_name, text) VALUES (%s,%s,%s) RETURNING *",
+                    (b.get("authorPhone"), b.get("authorName"), b.get("text")),
+                )
+                row = dict(cur.fetchone())
+            conn.commit()
+        return resp(201, row)
+
+    if path.startswith("/reviews/") and method == "DELETE":
+        review_id = path.split("/")[-1]
+        phone = qs.get("phone", "")
+        admin = qs.get("admin", "")
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                if admin == "true":
+                    cur.execute(f"DELETE FROM {SCHEMA}.reviews WHERE id=%s", (review_id,))
+                else:
+                    cur.execute(
+                        f"DELETE FROM {SCHEMA}.reviews WHERE id=%s AND regexp_replace(author_phone,'\\D','','g') = regexp_replace(%s,'\\D','','g')",
+                        (review_id, phone),
+                    )
+            conn.commit()
+        return resp(200, {"ok": True})
+
+    # ─── BLOCKED SLOTS ────────────────────────────────────────────
+    if path == "/blocked-slots" and method == "GET":
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(f"SELECT * FROM {SCHEMA}.blocked_slots ORDER BY date")
+                rows = cur.fetchall()
+        return resp(200, [dict(r) for r in rows])
+
+    if path == "/blocked-slots" and method == "POST":
+        b = body
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"INSERT INTO {SCHEMA}.blocked_slots (type, date, hours, all_day) VALUES (%s,%s,%s,%s) RETURNING *",
+                    (b.get("type"), b.get("date"), json.dumps(b.get("hours", [])), b.get("allDay", True)),
+                )
+                row = dict(cur.fetchone())
+            conn.commit()
+        return resp(201, row)
+
+    if path.startswith("/blocked-slots/") and method == "DELETE":
+        slot_id = path.split("/")[-1]
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(f"DELETE FROM {SCHEMA}.blocked_slots WHERE id=%s", (slot_id,))
+            conn.commit()
+        return resp(200, {"ok": True})
+
+    # ─── PHOTOS ───────────────────────────────────────────────────
+    if path == "/photos" and method == "GET":
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(f"SELECT * FROM {SCHEMA}.photos ORDER BY created_at")
+                rows = cur.fetchall()
+        return resp(200, [dict(r) for r in rows])
+
+    if path == "/photos" and method == "POST":
+        b = body
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(f"INSERT INTO {SCHEMA}.photos (url) VALUES (%s) RETURNING *", (b.get("url"),))
+                row = dict(cur.fetchone())
+            conn.commit()
+        return resp(201, row)
+
+    if path.startswith("/photos/") and method == "DELETE":
+        photo_id = path.split("/")[-1]
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(f"DELETE FROM {SCHEMA}.photos WHERE id=%s", (photo_id,))
+            conn.commit()
+        return resp(200, {"ok": True})
+
+    return resp(404, {"error": "Not found"})

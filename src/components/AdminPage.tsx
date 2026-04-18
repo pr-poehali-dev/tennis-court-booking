@@ -14,6 +14,7 @@ interface AdminPageProps {
   onRemoveBlockedSlot: (id: string) => void;
   onAddPhoto: (photo: CourtPhoto) => void;
   onRemovePhoto: (id: string) => void;
+  onDeleteReview?: (id: string) => void;
 }
 
 const ADMIN_PASSWORD = "Pinkpups07";
@@ -58,6 +59,7 @@ const AdminPage = ({
   onRemoveBlockedSlot,
   onAddPhoto,
   onRemovePhoto,
+  onDeleteReview,
 }: AdminPageProps) => {
   const [authenticated, setAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
