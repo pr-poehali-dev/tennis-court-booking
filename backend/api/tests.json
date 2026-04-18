@@ -1,11 +1,27 @@
 {
   "tests": [
     {
-      "name": "Health check",
+      "name": "GET bookings",
       "method": "GET",
-      "path": "/",
-      "expectedStatus": 404,
-      "expectedBody": {"error": "Not found"},
+      "path": "/?r=bookings",
+      "expectedStatus": 200,
+      "expectedBody": [],
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "GET reviews",
+      "method": "GET",
+      "path": "/?r=reviews",
+      "expectedStatus": 200,
+      "expectedBody": [],
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "GET photos",
+      "method": "GET",
+      "path": "/?r=photos",
+      "expectedStatus": 200,
+      "expectedBody": [{"id": 1}],
       "bodyMatcher": "partial"
     }
   ]

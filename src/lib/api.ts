@@ -1,7 +1,7 @@
 const BASE_URL = "https://functions.poehali.dev/3f4168e3-eb7f-42d3-bf2d-1e40393cbf59";
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
+async function request<T>(qs: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(`${BASE_URL}?${qs}`, {
     headers: { "Content-Type": "application/json" },
     ...options,
   });
@@ -12,46 +12,46 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 // ── Bookings ──────────────────────────────────────────────────────
 export const getBookings = (phone?: string) =>
-  request<BookingRow[]>(`/bookings${phone ? `?phone=${encodeURIComponent(phone)}` : ""}`);
+  request<BookingRow[]>(`r=bookings${phone ? `&phone=${encodeURIComponent(phone)}` : ""}`);
 
 export const createBooking = (body: CreateBookingBody) =>
-  request<BookingRow>("/bookings", { method: "POST", body: JSON.stringify(body) });
+  request<BookingRow>("r=bookings", { method: "POST", body: JSON.stringify(body) });
 
 export const updateBooking = (id: number, body: UpdateBookingBody) =>
-  request<BookingRow>(`/bookings/${id}`, { method: "PUT", body: JSON.stringify(body) });
+  request<BookingRow>(`r=bookings&id=${id}`, { method: "PUT", body: JSON.stringify(body) });
 
 export const deleteBooking = (id: number) =>
-  request<{ ok: boolean }>(`/bookings/${id}`, { method: "DELETE" });
+  request<{ ok: boolean }>(`r=bookings&id=${id}`, { method: "DELETE" });
 
 // ── Reviews ───────────────────────────────────────────────────────
-export const getReviews = () => request<ReviewRow[]>("/reviews");
+export const getReviews = () => request<ReviewRow[]>("r=reviews");
 
 export const createReview = (body: { authorPhone: string; authorName: string; text: string }) =>
-  request<ReviewRow>("/reviews", { method: "POST", body: JSON.stringify(body) });
+  request<ReviewRow>("r=reviews", { method: "POST", body: JSON.stringify(body) });
 
 export const deleteReview = (id: number, phone?: string, admin?: boolean) =>
   request<{ ok: boolean }>(
-    `/reviews/${id}?${phone ? `phone=${encodeURIComponent(phone)}` : ""}${admin ? "&admin=true" : ""}`,
+    `r=reviews&id=${id}${phone ? `&phone=${encodeURIComponent(phone)}` : ""}${admin ? "&admin=true" : ""}`,
     { method: "DELETE" }
   );
 
 // ── Blocked slots ─────────────────────────────────────────────────
-export const getBlockedSlots = () => request<BlockedSlotRow[]>("/blocked-slots");
+export const getBlockedSlots = () => request<BlockedSlotRow[]>("r=blocked-slots");
 
 export const createBlockedSlot = (body: { type: string; date: string; hours: number[]; allDay: boolean }) =>
-  request<BlockedSlotRow>("/blocked-slots", { method: "POST", body: JSON.stringify(body) });
+  request<BlockedSlotRow>("r=blocked-slots", { method: "POST", body: JSON.stringify(body) });
 
 export const deleteBlockedSlot = (id: number) =>
-  request<{ ok: boolean }>(`/blocked-slots/${id}`, { method: "DELETE" });
+  request<{ ok: boolean }>(`r=blocked-slots&id=${id}`, { method: "DELETE" });
 
 // ── Photos ────────────────────────────────────────────────────────
-export const getPhotos = () => request<PhotoRow[]>("/photos");
+export const getPhotos = () => request<PhotoRow[]>("r=photos");
 
 export const createPhoto = (url: string) =>
-  request<PhotoRow>("/photos", { method: "POST", body: JSON.stringify({ url }) });
+  request<PhotoRow>("r=photos", { method: "POST", body: JSON.stringify({ url }) });
 
 export const deletePhoto = (id: number) =>
-  request<{ ok: boolean }>(`/photos/${id}`, { method: "DELETE" });
+  request<{ ok: boolean }>(`r=photos&id=${id}`, { method: "DELETE" });
 
 // ── Types ─────────────────────────────────────────────────────────
 export interface BookingRow {
