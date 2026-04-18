@@ -63,7 +63,7 @@ function getAvailableHours(
 
   const available: number[] = [];
   const maxEnd = 23;
-  for (let h = 7; h <= maxEnd - duration; h += 0.5) {
+  for (let h = 7; h <= maxEnd - duration; h += 1) {
     const needed = [];
     for (let i = 0; i < duration * 2; i++) {
       needed.push(h + i * 0.5);

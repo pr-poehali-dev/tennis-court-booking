@@ -282,11 +282,11 @@ const HomePage = ({
                 <div className="flex justify-between"><span>Сезон</span><span className="font-semibold text-gray-900">20 апр — 1 ноя</span></div>
               </div>
               <div className="mt-4 pt-4 border-t border-gray-100">
-                <div className="text-xs text-gray-400 mb-1">Оплата за 10 мин до начала</div>
+                <div className="text-xs text-gray-400 mb-1">Есть вопросы? Звоните</div>
                 <div className="flex items-center gap-2">
                   <Icon name="Phone" size={14} className="text-[#2d6a4f]" />
                   <span className="font-semibold text-gray-800">8 930 278 29 29</span>
-                  <span className="text-xs text-gray-400">(Арсений, Т-Банк)</span>
+                  <span className="text-xs text-gray-400">(Арсений)</span>
                 </div>
               </div>
             </div>
